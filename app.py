@@ -1,13 +1,34 @@
+import functools
+import hmac
 import os
 import sqlite3
 from datetime import date
 from pathlib import Path
 
-from flask import Flask, g, redirect, render_template, request, url_for
+from dotenv import load_dotenv
+from flask import Flask, g, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
+
+load_dotenv()
 
 DB_PATH = Path(__file__).parent / "todo.db"
 
 app = Flask(__name__)
+
+app.secret_key = os.environ.get("SECRET_KEY")
+if not app.secret_key:
+    app.secret_key = "dev-only-insecure-secret-key"
+    print("WARNING: SECRET_KEY not set, using an insecure default. Set the SECRET_KEY env var in production.")
+
+AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "admin")
+AUTH_PASSWORD_HASH = os.environ.get("AUTH_PASSWORD_HASH")
+if not AUTH_PASSWORD_HASH:
+    AUTH_PASSWORD_HASH = generate_password_hash("admin")
+    print(
+        "WARNING: AUTH_PASSWORD_HASH not set, defaulting to username 'admin' / password 'admin'. "
+        "Generate a real hash with generate_password_hash('yourpassword') and set AUTH_USERNAME / "
+        "AUTH_PASSWORD_HASH env vars in production."
+    )
 
 
 def get_db():
@@ -50,7 +71,40 @@ def inject_today_display():
     return {"today_display": date.today().strftime("%A, %B %-d")}
 
 
+def login_required(view):
+    @functools.wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login", next=request.path))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+        if hmac.compare_digest(username, AUTH_USERNAME) and check_password_hash(
+            AUTH_PASSWORD_HASH, password
+        ):
+            session["logged_in"] = True
+            return redirect(request.args.get("next") or url_for("index"))
+        error = "Invalid username or password."
+
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def index():
     db = get_db()
     status = request.args.get("status", "all")
@@ -93,6 +147,7 @@ def index():
 
 
 @app.route("/add", methods=["POST"])
+@login_required
 def add_task():
     title = request.form.get("title", "").strip()
     notes = request.form.get("notes", "").strip()
@@ -114,6 +169,7 @@ def add_task():
 
 
 @app.route("/toggle/<int:task_id>", methods=["POST"])
+@login_required
 def toggle_task(task_id):
     db = get_db()
     db.execute("UPDATE tasks SET done = 1 - done WHERE id = ?", (task_id,))
@@ -122,6 +178,7 @@ def toggle_task(task_id):
 
 
 @app.route("/delete/<int:task_id>", methods=["POST"])
+@login_required
 def delete_task(task_id):
     db = get_db()
     db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
@@ -130,6 +187,7 @@ def delete_task(task_id):
 
 
 @app.route("/edit/<int:task_id>", methods=["GET", "POST"])
+@login_required
 def edit_task(task_id):
     db = get_db()
 
@@ -157,6 +215,7 @@ def edit_task(task_id):
 
 
 @app.route("/clear_done", methods=["POST"])
+@login_required
 def clear_done():
     db = get_db()
     db.execute("DELETE FROM tasks WHERE done = 1")
