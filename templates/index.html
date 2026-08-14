@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}My To-Do List{% endblock %}
+{% block content %}
+  <header class="page-header">
+    <h1>To-Do List</h1>
+    {% if total > 0 %}
+      <div class="progress">
+        <div class="progress-track">
+          <div class="progress-fill" style="width: {{ (done_count / total * 100)|round|int }}%"></div>
+        </div>
+        <p class="stats">{{ done_count }} of {{ total }} tasks done</p>
+      </div>
+    {% else %}
+      <p class="stats">Nothing on your list yet</p>
+    {% endif %}
+  </header>
+
+  <form class="add-form" action="{{ url_for('add_task') }}" method="post">
+    <input type="text" name="title" placeholder="What needs doing?" required autofocus>
+    <div class="add-form-row">
+      <input type="text" name="notes" placeholder="Notes (optional)">
+      <select name="priority">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+      <input type="date" name="due_date" min="{{ today }}">
+      <button type="submit">Add</button>
+    </div>
+  </form>
+
+  <nav class="filters">
+    <div class="filter-group">
+      <a class="{{ 'active' if status == 'all' else '' }}" href="{{ url_for('index', status='all', priority=priority) }}">All</a>
+      <a class="{{ 'active' if status == 'active' else '' }}" href="{{ url_for('index', status='active', priority=priority) }}">Active</a>
+      <a class="{{ 'active' if status == 'done' else '' }}" href="{{ url_for('index', status='done', priority=priority) }}">Done</a>
+    </div>
+    <div class="filter-group">
+      <a class="{{ 'active' if priority == 'all' else '' }}" href="{{ url_for('index', status=status, priority='all') }}">Any priority</a>
+      {% for p in priorities %}
+        <a class="{{ 'active' if priority == p else '' }}" href="{{ url_for('index', status=status, priority=p) }}">{{ p|capitalize }}</a>
+      {% endfor %}
+    </div>
+  </nav>
+
+  <ul class="task-list">
+    {% for task in tasks %}
+      <li class="task priority-{{ task.priority }} {{ 'done' if task.done else '' }}">
+        <form action="{{ url_for('toggle_task', task_id=task.id) }}" method="post" class="toggle-form">
+          <button type="submit" class="checkbox" aria-label="Toggle done">{{ '✓' if task.done else '' }}</button>
+        </form>
+        <div class="task-body">
+          <div class="task-title">{{ task.title }}</div>
+          {% if task.notes %}<div class="task-notes">{{ task.notes }}</div>{% endif %}
+          <div class="task-meta">
+            <span class="badge badge-{{ task.priority }}">{{ task.priority }}</span>
+            {% if task.due_date %}<span class="due">Due {{ task.due_date }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="task-actions">
+          <a href="{{ url_for('edit_task', task_id=task.id) }}">Edit</a>
+          <form action="{{ url_for('delete_task', task_id=task.id) }}" method="post" onsubmit="return confirm('Delete this task?');">
+            <button type="submit" class="link-btn">Delete</button>
+          </form>
+        </div>
+      </li>
+    {% else %}
+      <li class="empty">Nothing here. Add a task above.</li>
+    {% endfor %}
+  </ul>
+
+  {% if done_count > 0 %}
+    <form action="{{ url_for('clear_done') }}" method="post" class="clear-form">
+      <button type="submit" class="link-btn">Clear completed</button>
+    </form>
+  {% endif %}
+{% endblock %}
