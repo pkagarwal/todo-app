@@ -4,8 +4,31 @@
     {
       "name": "todo-app",
       "runtimeExecutable": "venv/bin/python",
-      "runtimeArgs": ["app.py"],
+      "runtimeArgs": [
+        "app.py"
+      ],
+      "cwd": "Todo-Python-App",
       "port": 5050
+    },
+    {
+      "name": "todo-react-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "cwd": "Todo-React-App",
+      "port": 5173
+    },
+    {
+      "name": "todo-vue-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "cwd": "Todo-Vue-App",
+      "port": 5175
     }
   ]
 }
